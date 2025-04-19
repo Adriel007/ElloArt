@@ -9,14 +9,24 @@ const noteColors = {
   B: "#8B00FF", // Violeta
 };
 
-// Função para clarear a cor base (mistura com branco)
+// Frequências das notas
+const noteFrequencies = {
+  C: 261.63,
+  D: 293.66,
+  E: 329.63,
+  F: 349.23,
+  G: 392.0,
+  A: 440.0,
+  B: 493.88,
+};
+
+// Clareia a cor (mistura com branco)
 function lightenColor(hex, factor = 0.5) {
   hex = hex.replace("#", "");
   let r = parseInt(hex.substring(0, 2), 16);
   let g = parseInt(hex.substring(2, 4), 16);
   let b = parseInt(hex.substring(4, 6), 16);
 
-  // Mistura ajustável com branco
   r = Math.floor(r + (255 - r) * factor);
   g = Math.floor(g + (255 - g) * factor);
   b = Math.floor(b + (255 - b) * factor);
@@ -27,34 +37,28 @@ function lightenColor(hex, factor = 0.5) {
     .toUpperCase()}`;
 }
 
-// Função para retornar a cor correspondente à nota
+// Retorna a cor para a nota (clara se for sustenido)
 function getColorForNote(note) {
   note = note.trim().toUpperCase();
-  if (note.length === 0) return null;
+  if (!note) return null;
 
-  // Se a nota contém acidental (ex.: C#)
   if (note.includes("#")) {
     const baseNote = note[0];
-    if (noteColors[baseNote]) {
-      return lightenColor(noteColors[baseNote]);
-    }
+    return noteColors[baseNote] ? lightenColor(noteColors[baseNote]) : null;
   } else {
-    if (noteColors[note]) {
-      return noteColors[note];
-    }
+    return noteColors[note] || null;
   }
-  return null;
 }
 
-// Desenha um gradiente de fundo no canvas
+// Desenha fundo gradiente
 function drawBackgroundGradient(ctx, w, h) {
   const gradient = ctx.createRadialGradient(
-    w / 2, // centro X
-    h / 2, // centro Y
-    0, // raio interno
-    w / 2, // centro X
-    h / 2, // centro Y
-    w / 1.3 // raio externo
+    w / 2,
+    h / 2,
+    0,
+    w / 2,
+    h / 2,
+    w / 1.3
   );
   gradient.addColorStop(0, "#FFFFFF");
   gradient.addColorStop(1, "#DDDDDD");
@@ -62,34 +66,99 @@ function drawBackgroundGradient(ctx, w, h) {
   ctx.fillRect(0, 0, w, h);
 }
 
-// Função para desenhar um polígono abstrato
+// Desenha polígono abstrato
 function drawPolygon(ctx, x, y, color) {
-  // Número de lados entre 4 e 8
   const sides = Math.floor(Math.random() * 5) + 4;
   const angleStep = (Math.PI * 2) / sides;
 
   ctx.beginPath();
   for (let i = 0; i < sides; i++) {
-    // Variação aleatória no raio para irregularidade
-    const radius = Math.random() * 150 + 50; // maior variação
+    const radius = Math.random() * 150 + 50;
     const angle = i * angleStep + Math.random() * (angleStep / 2);
     const newX = x + radius * Math.cos(angle);
     const newY = y + radius * Math.sin(angle);
-    if (i === 0) {
-      ctx.moveTo(newX, newY);
-    } else {
-      ctx.lineTo(newX, newY);
-    }
+    i === 0 ? ctx.moveTo(newX, newY) : ctx.lineTo(newX, newY);
   }
   ctx.closePath();
   ctx.fillStyle = color;
   ctx.fill();
 }
 
+// Toca som da nota
+function playNote(note, isSharp = false) {
+  const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  let frequency = noteFrequencies[note];
+  if (isSharp) {
+    frequency *= Math.pow(2, 1 / 12);
+  }
+
+  const oscillator = audioContext.createOscillator();
+  const gainNode = audioContext.createGain();
+
+  oscillator.type = "sine";
+  oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+  gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+
+  oscillator.connect(gainNode);
+  gainNode.connect(audioContext.destination);
+
+  oscillator.start();
+  oscillator.stop(audioContext.currentTime + 0.5);
+
+  oscillator.onended = () => {
+    oscillator.disconnect();
+    gainNode.disconnect();
+    audioContext.close();
+  };
+}
+
+function updateButtonColors(isSharp) {
+  const buttons = document.querySelectorAll(".note-btn");
+
+  buttons.forEach((btn) => {
+    const note = btn.dataset.note;
+    let color = noteColors[note];
+
+    if (isSharp) {
+      color = lightenColor(color, 0.5); // Clareia se for sustenido
+    }
+
+    btn.style.backgroundColor = color;
+
+    // Contraste automático
+    const rgb = parseInt(color.substring(1), 16);
+    const r = (rgb >> 16) & 0xff;
+    const g = (rgb >> 8) & 0xff;
+    const b = rgb & 0xff;
+    const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+    btn.style.color = luminance > 150 ? "black" : "white";
+  });
+}
+
+const downloadButton = document.getElementById("download");
+
+downloadButton.onclick = function (e) {
+  e.preventDefault();
+
+  const canvas = document.getElementById("artCanvas");
+
+  const link = document.createElement("a");
+  link.download = "arte-musical.png";
+  link.href = canvas.toDataURL("image/png");
+  link.click();
+
+  // SweetAlert de sucesso
+  Swal.fire({
+    icon: "success",
+    title: "Imagem salva!",
+    text: "Sua arte foi baixada com sucesso.",
+    confirmButtonColor: "#3085d6",
+    confirmButtonText: "OK",
+  });
+};
+
 window.addEventListener("load", function () {
-  const submitButton = document.querySelector("#submit");
   const clearButton = document.querySelector("#clear");
-  const eraserButton = document.querySelector("#eraserButton");
   const label = document.querySelector("label[for='sharpCheckbox']");
 
   const canvas = document.getElementById("artCanvas");
@@ -99,84 +168,62 @@ window.addEventListener("load", function () {
   const sharpCheckbox = document.getElementById("sharpCheckbox");
   const noteDisplay = document.getElementById("noteDisplay");
 
+  noteDisplay.value = "";
+
   sharpCheckbox.checked = false;
 
-  label.onclick = function () {
-    if (label.classList.contains("btn-secondary")) {
+  sharpCheckbox.addEventListener("change", function () {
+    const isChecked = sharpCheckbox.checked;
+
+    // Atualiza cor do botão sustenido
+    if (isChecked) {
       label.classList.remove("btn-secondary");
       label.classList.add("btn-warning");
     } else {
       label.classList.remove("btn-warning");
       label.classList.add("btn-secondary");
     }
-  };
 
+    // Atualiza as cores dos botões de nota
+    updateButtonColors(isChecked);
+  });
+
+  // Clique em cada nota
   noteButtons.forEach((button) => {
     button.addEventListener("click", function () {
-      let note = this.dataset.note;
-      // Se o checkbox estiver marcado, adiciona o "#"
-      if (sharpCheckbox.checked) {
-        note += "#";
-      }
-      // Adiciona a nota ao campo de saída, separando por espaço
+      const baseNote = this.dataset.note;
+      const isSharp = sharpCheckbox.checked;
+      const note = isSharp ? baseNote + "#" : baseNote;
+
+      playNote(baseNote, isSharp);
+
+      // Atualiza textarea
       noteDisplay.value = noteDisplay.value
         ? noteDisplay.value + " " + note
         : note;
-    });
-  });
 
-  // Desenha o fundo gradiente uma vez ao carregar
-  drawBackgroundGradient(ctx, canvas.width, canvas.height);
-
-  submitButton.onclick = function (e) {
-    e.preventDefault();
-    const inputText = noteDisplay.value;
-    // Separa as notas por espaço e filtra entradas vazias
-    const notes = inputText.split(" ").filter((n) => n.trim() !== "");
-
-    if (notes.length === 0) {
-      alert("Por favor, insira pelo menos uma nota.");
-      return;
-    }
-
-    notes.forEach((note) => {
+      // Desenha automaticamente no canvas
       const color = getColorForNote(note);
       if (color) {
-        // Para cada nota, desenhamos múltiplos polígonos para "preencher" mais
-        const shapesPerNote = 3; // Ajuste para mais/menos formas
-
+        const shapesPerNote = 3;
         for (let i = 0; i < shapesPerNote; i++) {
-          // Define posição aleatória no canvas
           const x = Math.random() * canvas.width;
           const y = Math.random() * canvas.height;
-
-          // Define um nível de transparência aleatório
           ctx.globalAlpha = Math.random() * 0.5 + 0.5;
           drawPolygon(ctx, x, y, color);
         }
-
-        // Restaura a opacidade para 1, caso precise desenhar outras coisas depois
         ctx.globalAlpha = 1.0;
-
-        // Limpa o campo de saída
-        noteDisplay.value = "";
-      } else {
-        alert(
-          `Nota inválida: ${note}. Use C, D, E, F, G, A, B ou notas com acidental como C#.`
-        );
       }
     });
-  };
+  });
+
+  // Fundo ao carregar
+  drawBackgroundGradient(ctx, canvas.width, canvas.height);
 
   clearButton.onclick = function (e) {
     e.preventDefault();
     noteDisplay.value = "";
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawBackgroundGradient(ctx, canvas.width, canvas.height);
-  };
-
-  eraserButton.onclick = function (e) {
-    e.preventDefault();
-    noteDisplay.value = noteDisplay.value.split(" ").slice(0, -1).join(" ");
   };
 });

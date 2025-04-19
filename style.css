@@ -1,0 +1,39 @@
+.note-btn[data-note="C"] {
+    background-color: #FF0000;
+    color: white;
+  }
+
+  .note-btn[data-note="D"] {
+    background-color: #FF7F00;
+    color: white;
+  }
+
+  .note-btn[data-note="E"] {
+    background-color: #FFFF00;
+    color: black;
+  }
+
+  .note-btn[data-note="F"] {
+    background-color: #00FF00;
+    color: black;
+  }
+
+  .note-btn[data-note="G"] {
+    background-color: #0000FF;
+    color: white;
+  }
+
+  .note-btn[data-note="A"] {
+    background-color: #4B0082;
+    color: white;
+  }
+
+  .note-btn[data-note="B"] {
+    background-color: #8B00FF;
+    color: white;
+  }
+
+  /* Para deixar mais suave no hover */
+  .note-btn:hover {
+    filter: brightness(1.2);
+  }
